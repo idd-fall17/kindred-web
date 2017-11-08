@@ -1,4 +1,4 @@
-from flask import Flask, request
+from flask import Flask, request, jsonify
 from flask_mysqldb import MySQL
 
 import json
@@ -14,17 +14,51 @@ def hello():
     return "Hello World!"
 
 
-# get or post profile
+# get all devices assignmed to a given student
 # TODO: error handling of any kind
-@app.route("/profile/<student_name>/<profile_type>")
-def getProfile(student_name, profile_type):
-    student_id = getStudent(student_name)[0]    
+# TODO: what if two students have the same name?
+# TODO: delete device
+@app.route("/devices")
+def getDevices():
 
-    # get all devices
-    devices = getStudentDevicesByProfile(student_id, profile_type)
+    # is this limited by student?
+    student_name = request.args.get('student_name')
+    limit = request.args.get('limit')
 
-    return "Getting Student Profile!"
+    # limit default is 5
+    if(limit is None):
+        limit = 5
+    
+    # get all student devices
+    if(student_name is not None):
+        devices = getDevicesByStudent(student_name, limit)
+    else:    
+        devices = getAllDevices(limit)
+    
 
+    # set up response data
+    response = {}
+   
+    # TODO: this should be real data 
+    requestInfo = {}
+    requestInfo["status"] = "200 OK";
+    requestInfo["request type"] = "GET"
+    
+    response["request info"] = requestInfo;
+    
+    deviceInfo = []
+    for device in devices:    
+
+        data = {}
+        data["device_uuid"] = device[2]
+        data["device_msg"] = device[3]
+        data["device_label"] = device[4]
+        data["device_icon"] = device[5]
+        deviceInfo.append(data) 
+
+    response["device info"] = deviceInfo;
+
+    return jsonify(response)
 
 @app.route("/device", methods=["POST"])
 def addDevice():
@@ -32,12 +66,12 @@ def addDevice():
     # student name
     data = json.loads(request.data)
     student_name = data["student_name"]
-    profile_type = data["profile_type"]
-    device_id = data["device_id"]
-    service_id = data["service_id"]
-    read_msg = data["read_msg"]
+    device_uuid = data["device_uuid"]
+    device_label = data["device_label"]
+    device_msg = data["device_msg"]
+    device_icon = data["device_icon"]
 
-    # create student
+    # create student if new
     student = getStudent(student_name) 
     print(student)
     if student is None:
@@ -47,54 +81,62 @@ def addDevice():
     student_id = student[0]
     print(student_id);
 
-    # create device
-    device_profile = getDeviceProfile(device_id, profile_type);
-    if(not device_profile):
-        addDeviceProfile(device_id, service_id, profile_type, read_msg);
-        device_profile = getDeviceProfile(device_id, profile_type);
-    device_profile_id = device_profile[0] 
- 
-    # add to student_devices
-    addStudentDevice(student_id, device_profile_id);
+    # create/reassign device
+    device = getDeviceByUUID(device_uuid);
+    if(not device):
+        addDevice(student_id, device_uuid, device_label, device_msg, device_icon);
+    else:
+        updateDevice(device[0], student_id, device_label, device_msg, device_icon);
     
-    return "DONE!";
+    response = {}
+    
+    requestInfo = {}
+    requestInfo["status"] = "200 OK";
+    requestInfo["request type"] = "GET"
+    
+    response["request info"] = requestInfo;
+    
+    return jsonify(response)
  
 def getStudent(student_name):
     cur = mysql.connection.cursor()
     cur.execute("SELECT * FROM students WHERE student_name = '%s'" % student_name)
     return cur.fetchone()
 
-def getDeviceProfile(device_id, profile):
+def getAllDevices(limit):
     cur = mysql.connection.cursor()
-    cur.execute("SELECT id FROM device_profiles WHERE device_id = '%s' AND profile = '%s'" % (device_id, profile))
-    return cur.fetchone()
-
-def getStudentDevicesByProfile(student_id, profile):
-    cur = mysql.connection.cursor()
-    sql_statement = "select * from student_devices, device_profiles where student_devices.student_id = %s and student_devices.device_profile_id = device_profiles.id and device_profiles.profile = '%s'" % (student_id, profile);
+    sql_statement = "select students.student_name, devices.* from devices, students where students.id = devices.student_id limit %s" % (limit);
     cur.execute(sql_statement)
     return cur.fetchall()
 
-def addStudent(student_name):
-    conn = mysql.connection
-    cur = conn.cursor()
-    sql_statement = "INSERT INTO students (student_name) VALUES ('%s')" % student_name;
+def getDevicesByStudent(student_name, limit):
+    cur = mysql.connection.cursor()
+    sql_statement = "select devices.* from devices, students where students.student_name = '%s' and students.id = devices.student_id limit %s" % (student_name, limit);
     cur.execute(sql_statement)
-    conn.commit()
+    return cur.fetchall()
 
-def addDeviceProfile(device_id, service_id, profile, read_msg):
+def getDeviceByUUID(device_uuid):
+    cur = mysql.connection.cursor()
+    sql_statement = "select id from devices where device_uuid = '%s'" % (device_uuid);
+    cur.execute(sql_statement)
+    return cur.fetchone()
+   
+def addDevice(student_id, device_uuid, device_label, device_msg, device_icon):
     conn = mysql.connection
     cur = conn.cursor()
-    sql_statement = "INSERT INTO device_profiles (device_id, service_id, profile, read_msg)VALUES ('%s', '%s', '%s', '%s')" % (device_id, service_id, profile, read_msg);
+    sql_statement = "insert into devices (student_id, device_uuid, device_label, device_message, device_icon) values (%s, '%s', '%s', '%s', '%s')" % (student_id, device_uuid, device_label, device_msg, device_icon);
+    print(sql_statement);
     cur.execute(sql_statement); 
     conn.commit()
 
-def addStudentDevice(student_id, device_profile_id):
+def updateDevice(device_uuid, student_id, device_label, device_msg, device_icon):
     conn = mysql.connection
     cur = conn.cursor()
-    sql_statement = "INSERT INTO student_devices (student_id, device_profile_id) VALUES ('%s', '%s')" % (student_id, device_profile_id);
+    sql_statement = "UPDATE devices SET student_id=%s, device_label='%s', device_message='%s', device_icon='%s' where id=%s"  % (student_id, device_label, device_msg, device_icon, device_uuid);
+    print(sql_statement);
     cur.execute(sql_statement); 
     conn.commit()
+   
 
-    
-    
+# TODO: delete user
+# TODO: delete device
