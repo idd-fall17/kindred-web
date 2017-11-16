@@ -60,6 +60,24 @@ def getDevices():
 
     return jsonify(response)
 
+@app.route("/studentList")
+def getStudentList():
+
+    students = getStudentListData()
+
+    # set up response data
+    response = []
+   
+    student_info = []
+    for student in students:
+        data = {}
+        data["student_name"] = student[0]
+        data["device_count"] = student[1]
+        response.append(data)    
+
+    return jsonify(response)
+
+
 @app.route("/device", methods=["POST"])
 def addDevice():
 
@@ -102,6 +120,12 @@ def getStudent(student_name):
     cur = mysql.connection.cursor()
     cur.execute("SELECT * FROM students WHERE student_name = '%s'" % student_name)
     return cur.fetchone()
+
+def getStudentListData():
+    cur = mysql.connection.cursor()
+    sql_statement = "select students.student_name, COUNT(devices.id) AS NumberOfDevices from devices, students where students.id = devices.student_id group by students.id"
+    cur.execute(sql_statement)
+    return cur.fetchall()
 
 def getAllDevices(limit):
     cur = mysql.connection.cursor()
