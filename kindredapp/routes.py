@@ -18,6 +18,28 @@ def hello():
 # TODO: error handling of any kind
 # TODO: what if two students have the same name?
 # TODO: delete device
+
+@app.route("/devices/<student_name>")
+def getDevicesByStudent(student_name):
+
+    # is this limited by student?
+    print(student_name)
+    devices = getDevicesByStudent(student_name, 20)
+
+    # set up response data
+    response = []
+   
+    for device in devices:    
+
+        data = {}
+        data["device_uuid"] = device[2]
+        data["device_msg"] = device[3]
+        data["device_label"] = device[4]
+        data["device_icon"] = device[5]
+        response.append(data) 
+
+    return jsonify(response)
+
 @app.route("/devices")
 def getDevices():
 
