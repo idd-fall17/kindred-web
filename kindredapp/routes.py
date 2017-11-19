@@ -2,6 +2,8 @@ from flask import Flask, request, jsonify
 from flask_mysqldb import MySQL
 
 import json
+import operator
+from operator import itemgetter
 
 app = Flask(__name__)
 app.config['MYSQL_HOST'] = '127.0.0.1'
@@ -93,11 +95,14 @@ def getStudentList():
     student_info = []
     for student in students:
         data = {}
-        data["student_name"] = student[0]
+        data["student_name"] = student[0].capitalize()
         data["device_count"] = student[1]
         response.append(data)    
 
-    return jsonify(response)
+    # sort alphabetically
+    sorted_response = sorted(response, key=itemgetter('student_name'))
+
+    return jsonify(sorted_response)
 
 
 @app.route("/device", methods=["POST"])
@@ -137,6 +142,32 @@ def addDevice():
     response["request info"] = requestInfo;
     
     return jsonify(response)
+
+@app.route("/device/<device_uuid>", methods=["DELETE"])
+def deleteDevice(device_uuid):
+
+    deleteDeviceByUUID(device_uuid)
+
+    response = {}
+    
+    requestInfo = {}
+    requestInfo["status"] = "200 OK";
+    requestInfo["request type"] = "DELETE"
+    
+    response["request info"] = requestInfo;
+    
+    return jsonify(response)
+
+
+
+
+
+
+
+
+
+
+
  
 def getStudent(student_name):
     cur = mysql.connection.cursor()
@@ -167,6 +198,14 @@ def getDeviceByUUID(device_uuid):
     cur.execute(sql_statement)
     return cur.fetchone()
    
+
+def addStudent(student_name):
+    conn = mysql.connection
+    cur = conn.cursor()
+    sql_statement = "INSERT INTO students (student_name) VALUES ('%s')" % student_name;
+    cur.execute(sql_statement)
+    conn.commit()
+
 def addDevice(student_id, device_uuid, device_label, device_msg, device_icon):
     conn = mysql.connection
     cur = conn.cursor()
@@ -183,6 +222,13 @@ def updateDevice(device_uuid, student_id, device_label, device_msg, device_icon)
     cur.execute(sql_statement); 
     conn.commit()
    
+def deleteDeviceByUUID(device_uuid):
+    conn = mysql.connection
+    cur = conn.cursor()
+    sql_statement = "delete from devices where device_uuid = '%s'" % device_uuid;
+    print(sql_statement);
+    cur.execute(sql_statement); 
+    conn.commit()
+
 
 # TODO: delete user
-# TODO: delete device
