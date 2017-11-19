@@ -158,17 +158,25 @@ def deleteDevice(device_uuid):
     
     return jsonify(response)
 
+@app.route("/student/<student_name>", methods=["DELETE"])
+def deleteStudent(student_name):
 
+    # delete student devices
+    deleteAllStudentDevices(student_name)
 
+    # delete student
+    deleteStudentByName(student_name)
 
+    response = {}
+    
+    requestInfo = {}
+    requestInfo["status"] = "200 OK";
+    requestInfo["request type"] = "DELETE"
+    
+    response["request info"] = requestInfo;
+    
+    return jsonify(response)
 
-
-
-
-
-
-
- 
 def getStudent(student_name):
     cur = mysql.connection.cursor()
     cur.execute("SELECT * FROM students WHERE student_name = '%s'" % student_name)
@@ -202,7 +210,7 @@ def getDeviceByUUID(device_uuid):
 def addStudent(student_name):
     conn = mysql.connection
     cur = conn.cursor()
-    sql_statement = "INSERT INTO students (student_name) VALUES ('%s')" % student_name;
+    sql_statement = "INSERT INTO students (student_name) VALUES ('%s')" % student_name.capitalize();
     cur.execute(sql_statement)
     conn.commit()
 
@@ -226,9 +234,20 @@ def deleteDeviceByUUID(device_uuid):
     conn = mysql.connection
     cur = conn.cursor()
     sql_statement = "delete from devices where device_uuid = '%s'" % device_uuid;
-    print(sql_statement);
     cur.execute(sql_statement); 
     conn.commit()
 
+def deleteStudentByName(student_name):
+    conn = mysql.connection
+    cur = conn.cursor()
+    sql_statement = "delete from students where student_name = '%s'" % student_name.capitalize();
+    cur.execute(sql_statement); 
+    conn.commit()
 
-# TODO: delete user
+def deleteAllStudentDevices(student_name):
+    conn = mysql.connection
+    cur = conn.cursor()
+    sql_statement = "DELETE devices FROM devices INNER JOIN students ON students.id = devices.student_id WHERE students.student_name = '%s'" % student_name.capitalize()
+    cur.execute(sql_statement); 
+    conn.commit()
+
